@@ -29,6 +29,12 @@
     "jest": "^30.4.2"
   },
   "jest": {
+    "coverageReporters": [
+      "json-summary",
+      "lcov",
+      "text",
+      "clover"
+    ],
     "coverageThreshold": {
       "global": {
         "branches": 80,
