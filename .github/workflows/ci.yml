@@ -52,7 +52,7 @@ jobs:
         run: npm run test:ci
 
       - name: Résumé de couverture
-        if: ${{ always() }}
+        if: always()
         run: |
           echo '## 📊 Couverture de code — Node ${{ matrix.node-version }}' >> $GITHUB_STEP_SUMMARY
           if [ -f coverage/coverage-summary.json ]; then
@@ -94,3 +94,13 @@ jobs:
             exit 1
           fi
           echo 'CI entièrement vert ✓'
+
+  notify-failure:
+    name: 🔔 Notifier échec
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    if: failure() # S'exécute SEULEMENT si un job précédent a échoué
+    steps:
+      - name: Notifier via webhook
+        run: |
+          curl -X POST -H 'Content-type: application/json' \--data '{"text":"🔴 Pipeline CI échoué sur ${{ github.repository }} —${{ github.sha }}"}' \${{ secrets.SLACK_WEBHOOK_URL }}
