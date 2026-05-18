@@ -1,3 +1,5 @@
+var unused_variable = "je ne suis jamais utilisée";
+
 function add(a, b) {
   return a + b;
 }
