@@ -68,6 +68,13 @@ jobs:
             " >> $GITHUB_STEP_SUMMARY
           fi
 
+      - name: Commenter la PR avec la couverture
+        if: github.event_name == 'pull_request'
+        uses: MishaKav/jest-coverage-comment@main
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          coverage-summary-path: ./coverage/coverage-summary.json
+
       - name: Upload rapport de couverture
         uses: actions/upload-artifact@v4
         if: always() # Même si les tests échouent
