@@ -1,111 +1,88 @@
-name: CI - Lint, Tests & Coverage
+name: CI/CD - Tests, Build & Push Docker
 
-on:
+"on":
   push:
-    branches: [main, "feature/**"]
-    paths: # ← Ajoutez ceci
-      - "src/**" # se déclenche si src/ change
-      - "package*.json" # ou si les dépendances changent
-      - ".github/workflows/**" # ou si les workflows changent
+    branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch:
 
-# Annule les runs obsoletes sur la meme branche
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }} # user/mon-premier-cicd
 
 jobs:
-  # Job 1: Lint
+  # JOB 1: Lint
   lint:
-    name: Lint ESLint
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "18"
-          cache: "npm"
-      - name: Installation des dependances
-        run: npm ci
-      - name: Verification ESLint
-        run: npm run lint
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
 
-  # Job 2: Tests matrix
+  # JOB 2: Tests
   test:
-    name: Tests Node.js ${{ matrix.node-version }}
+    name: Tests
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
       matrix:
         node-version: [18, 20]
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: "npm"
-      - name: Installation des dependances
-        run: npm ci
-      - name: Tests unitaires + couverture
-        run: npm run test:ci
-
-      - name: Commenter la PR avec la couverture
-        if: github.event_name == 'pull_request' && matrix.node-version == 18
-        uses: MishaKav/jest-coverage-comment@main
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          coverage-summary-path: ./coverage/coverage-summary.json
-
-      - name: Upload rapport de couverture
-        uses: actions/upload-artifact@v4
+          cache: npm
+      - run: npm ci
+      - run: npm run test:ci
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: coverage-node-${{ matrix.node-version }}
           path: coverage/
-          retention-days: 14
 
-  # Job 3: Rapport consolide
-  report:
-    name: Rapport Coverage
+  # JOB 3: Build & Push Docker
+  docker:
+    name: Docker Build & Push
     runs-on: ubuntu-latest
-    needs: [lint, test]
-    if: always()
+    needs: [lint, test] # Attend lint ET test
+    if: github.ref == 'refs/heads/main' # Seulement sur main
+    permissions:
+      contents: read
+      packages: write # Necessaire pour pusher sur GHCR
     steps:
-      - uses: actions/checkout@v4
-      - name: Telecharger tous les rapports
-        uses: actions/download-artifact@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login sur GHCR
+        uses: docker/login-action@v3
         with:
-          pattern: coverage-node-*
-          merge-multiple: false
-          path: all-coverage/
-      - name: Afficher le resume dans Step Summary
-        run: |
-          echo "## Rapport de Couverture" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Version | Statements | Branches | Functions | Lines |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|------------|----------|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-          for dir in all-coverage/coverage-node-*/; do
-            version=$(basename "$dir" | sed 's/coverage-node-//')
-            summary="$dir/coverage-summary.json"
-            if [ -f "$summary" ]; then
-              node -e "
-                const total = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).total;
-                console.log('| Node ${version} | ' + total.statements.pct + '% | ' + total.branches.pct + '% | ' + total.functions.pct + '% | ' + total.lines.pct + '% |');
-              " "$summary" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
+      - name: Extraire les metadonnees (tags & labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
 
-      - name: Résultat global CI
-        run: |
-          lint_ok='${{ needs.lint.result }}'
-          test_ok='${{ needs.test.result }}'
-          echo "Lint: $lint_ok | Tests: $test_ok"
-          if [ "$lint_ok" != 'success' ] || [ "$test_ok" != 'success' ]; then
-            echo '❌ CI échoué' >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
-          echo '✅ CI complet — tous les jobs sont verts' >> $GITHUB_STEP_SUMMARY
+      - name: Build & Push l'image Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha # Cache GitHub Actions
+          cache-to: type=gha,mode=max
