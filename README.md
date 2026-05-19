@@ -11,5 +11,3 @@ Premier pipeline CI/CD avec GitHub Actions, Node.js, Jest et ESLint.
 ```bash
 npm ci && npm test
 ```
-
-d
