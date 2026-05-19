@@ -3,6 +3,10 @@ name: CI - Lint, Tests & Coverage
 on:
   push:
     branches: [main, "feature/**"]
+    paths: # ← Ajoutez ceci
+      - "src/**" # se déclenche si src/ change
+      - "package*.json" # ou si les dépendances changent
+      - ".github/workflows/**" # ou si les workflows changent
   pull_request:
     branches: [main]
   workflow_dispatch:
