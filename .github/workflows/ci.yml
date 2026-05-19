@@ -81,21 +81,8 @@ jobs:
             type=semver,pattern={{major}}.{{minor}} # v1.2
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Scanner l'image avec Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          format: table
-          exit-code: "1" # Fait échouer si vuln CRITICAL
-          severity: CRITICAL,HIGH
-      - name: Upload rapport Trivy
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: trivy-report
-          path: trivy-results.sarif
-
       - name: Build & Push l'image Docker
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -104,3 +91,19 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha # Cache GitHub Actions
           cache-to: type=gha,mode=max
+
+      - name: Scanner l'image avec Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: "1" # Fait echouer si vuln CRITICAL/HIGH
+          severity: CRITICAL,HIGH
+
+      - name: Upload rapport Trivy
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-report
+          path: trivy-results.sarif
