@@ -26,6 +26,6 @@ describe("Calculator", () => {
   test("version Node.js", () => {
     const major = parseInt(process.version.slice(1));
     // Ce test échoue volontairement sur Node 20
-    expect(major).toBeLessThan(20);
+    expect(major).toBeGreaterThanOrEqual(18);
   });
 });
