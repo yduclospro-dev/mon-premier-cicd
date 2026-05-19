@@ -26,7 +26,10 @@ WORKDIR /app
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/src ./src
 
-# Installer UNIQUEMENT les dépendances de production
+# Ajouter NODE_ENV=production pour garantir que seules les dépendances de production sont installées
+ENV NODE_ENV=production
+
+# Installer uniquement les dépendances de production
 RUN npm ci --only=production
 
 # Sécurité : utilisateur non-root
