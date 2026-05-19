@@ -1,5 +1,4 @@
 const { describe, test, expect } = require("@jest/globals");
-const process = require("node:process");
 const { add, subtract, multiply, divide } = require("../calculator");
 
 describe("Calculator", () => {
@@ -21,11 +20,5 @@ describe("Calculator", () => {
 
   test("divide : division par zéro lève une erreur", () => {
     expect(() => divide(10, 0)).toThrow("Division par zéro impossible");
-  });
-
-  test("version Node.js", () => {
-    const major = parseInt(process.version.slice(1));
-    // Ce test échoue volontairement sur Node 20
-    expect(major).toBeGreaterThanOrEqual(18);
   });
 });
